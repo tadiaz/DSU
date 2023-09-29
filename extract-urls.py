@@ -1,3 +1,5 @@
+#! /usr/bin/python3
+
 from pyxlsb import open_workbook
 from colorama import Fore, Style
 from openpyxl import load_workbook #
@@ -10,6 +12,9 @@ import requests
 import re
 import json #
 import subprocess #
+import msoffcrypto
+import io
+from tempfile import NamedTemporaryFile
 
 URLHAUS_API = "https://urlhaus-api.abuse.ch/v1/url/"
 regex_uri = "https?:\/\/[a-zA-Z0-9\.\/\-\:]{5,}\.\w{1,}"
@@ -26,27 +31,41 @@ def setup_args():
 def extract_downloader_links(file_path):
 	try:
 		try: # first let us try to open the file in xlrd 
-			xls = xlrd.open_workbook(file_path)
+			with open(file_path, "rb") as f, NamedTemporaryFile(suffix='.xls', delete=False) as tmpf:
+					file = msoffcrypto.OfficeFile(f)
+					if file_path[-12:] == 'dridex01.xls':
+						file.load_key(password='50821')
+					elif file_path[-12:] == 'dridex02.xls':
+						file.load_key(password='68443')
+					elif file_path[-12:] == 'dridex03.xls':
+						file.load_key(password='27158')
+					else:
+						file.load_key(password='VelvetSweatshop')
+					file.decrypt(tmpf)
+
+			xls = xlrd.open_workbook(tmpf.name)
 			print(f"{Fore.GREEN}[*]{Style.RESET_ALL} Working file: " + file_path)
 			obf = []
 
 			# for every sheet we run through every row and coll and look at the cell value if its not empty
 			for sheet in xls.sheets():
 				ws = xls[sheet.name]
-
+			
 				rows = ws.nrows
 				cols = ws.ncols
 				# if the cell is not empty we append it to obf just like the original script the 
 				# rest of the script can then pick through the info to extract the urls
 				for row in range(rows):
+					#obf.append(sheet.row_values(rowx=row, start_colx=0, end_colx=None))
 					for col in range(cols):
 						cell = sheet.cell(row,col)
 						if cell.value!=None and cell.value!="":
 							obf.append(cell.value)
-			
-
+							# print(cell.value, end = ' ')  # uncomment this code to see the values from the encrypted workbooks
+				
 		except:	
-			try: # if we couldn't open it with xlrd then we will try openpyxl
+			#try: # if we couldn't open it with xlrd then we will try openpyxl
+								
 				xls = load_workbook(filename=file_path, data_only=True)
 				print(f"{Fore.GREEN}[*]{Style.RESET_ALL} Working file: " + file_path)
 				obf = []
@@ -58,19 +77,7 @@ def extract_downloader_links(file_path):
 						for c in row:
 							if c.value!=None:
 								obf.append(c.value)
-
-			except: # if the previous things didnt work then we try the original script with xlsb
-				xls = open_workbook(file_path)
-
-				print(f"{Fore.GREEN}[*]{Style.RESET_ALL} Working file: " + file_path)
-				obf = []	
-
-				for sheet in xls.sheets:
-					s = xls.get_sheet(sheet)
-					for row in s.rows(sparse=True):
-						for c in row:
-							if c.v != None:
-								obf.append(c.v)
+			
 		urls = []
 		script = ""
 		tmp_urls = ""
