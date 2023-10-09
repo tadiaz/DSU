@@ -1,0 +1,81 @@
+# Your rules go in this file! Comment out previous versions or things you want to keep around with a '#' in front.
+
+#alert http $EXTERNAL_NET 80 -> $HOME_NET any (msg:"TAD MALWARE Attempt to download malware!";\
+#	flow:from_server; http.response_body; content:"MZ"; flowbits: isset, rule1;\
+#	sid:2000001;)
+	
+#alert http $HOME_NET any -> $EXTERNAL_NET 80 (msg:"TAD INFORMATIONAL Microsoft Update detected!";\
+#	flow:to_server; http.uri; content:"/msdownload/update/"; content:"/static/trustedr/en/";\ 
+#	http.host; content:"ctldl.windowsupdate.com"; http.user_agent;\
+#	content:"Microsoft-CryptoAPI"; startswith;\
+#	sid:2000002;)
+	
+#alert http $HOME_NET any -> $EXTERNAL_NET 80 (msg:"TAD TRACKING Suspicious activity.";\
+#	flow:to_server; http.request_line; content:"vqUuJ3B7"; http.host;\
+#	content:"www.upex.ee"; flowint:totallySus,+,1; flowint:totallySus,==,1; noalert;\
+#	sid:2000003;)
+
+#alert http $EXTERNAL_NET 80 -> $HOME_NET any (msg:"TAD TRACKING Suspicious activity.";\
+#	flow:to_client; content:"vqUuJ3B7"; http.location; content:"www.upex.ee";\ 
+#	http.stat_code; content:"301"; flowint:totallySus,+,1; noalert;\
+#	sid:2000004;)
+	
+#alert http $HOME_NET any -> $EXTERNAL_NET 80 (msg:"TAD TRACKING Suspicious activity.";\
+#	flow:to_server; http.request_line; content:"vqUuJ3B7"; http.host;\
+#	content:"www.upex.ee"; flowint:totallySus,>=,2; flowint:totallySus,+,1; noalert;\
+#	sid:2000005;)
+	
+#alert http $EXTERNAL_NET 80 -> $HOME_NET any (msg:"TAD MALWARE Attempt to download Emotet detected!";\
+#	flow:to_client; content:"Expires: Tue, 01 Jan 1970 00:00:00 GMT";\
+#	content:"MZ"; content:"This program cannot be run in DOS mode.";\
+#	flowint:totallySus,>=,3; sid:2000006;)
+		
+#alert http $HOME_NET any -> $EXTERNAL_NET 80 (msg:"TAD HUNTING Suspicious base64 detected!";\
+#	flow:to_server; http.host; content:"47.34.43.223";\
+#	http.cookie; pcre:"/[A-Za-z0-9+\/=]|=[^=]|={3,}/";\
+#	http.uri; content:"/"; startswith;\
+#	sid:2000007;
+	
+#alert http $EXTERNAL_NET 80 -> $HOME_NET any (msg:"TAD HUNTING Suspicious HTML detected!";\
+#	flow:to_client; content:!"<html>"; content:!"<head>"; content:!"<title>";\
+#	content:!"<body>"; content:!"<h1>";  content:!"<h2>";  content:!"<h3>";\
+#	content:!"<h4>"; content:!"<h5>"; content:!"<h6>"; content:!"<br>";\
+#	content:!"<p>"; content:!"<a href="; content:!"<form"; content:!"</html>";\
+#	content:!"</head>"; content:!"</title>"; content:!"</body>"; content:!"</h1>";\
+#	content:!"</h2>"; content:!"</h3>"; content:!"</h4>"; content:!"</h5>";\
+#	content:!"</h6>"; content:!"</br>"; content:!"</p>"; content:!"</a>";\
+#	content:!"</form>"; content:!"%20"; content:!"<div>"; content:!"</div>";\
+#	http.content_type; content:"text/html"; startswith;\
+#	sid:2000008;)
+
+# alternative for problem 4
+#alert http $HOME_NET any -> $EXTERNAL_NET 80 (msg:"TAD HUNTING Suspicious base64 detected!";\
+#	flow:to_server; http.host; content:"47.34.43.223";\
+#	http.cookie; pcre:"/[A-Za-z0-9+\/=]|=[^=]|={3,}/";\
+#	http.uri; content:"/"; startswith; \
+#	flowint: susEncoding, notset; flowint: susEncoding,=,1; noalert; sid:2000007;
+	
+#alert http $EXTERNAL_NET 80 -> $HOME_NET any (msg:"TAD HUNTING Suspicious Base64/HTML detected!";\
+#	flow:to_client; content:!"<html>"; content:!"<head>"; content:!"<title>";\
+#	content:!"<body>"; content:!"<h1>";  content:!"<h2>";  content:!"<h3>";\
+#	content:!"<h4>"; content:!"<h5>"; content:!"<h6>"; content:!"<br>";\
+#	content:!"<p>"; content:!"<a href="; content:!"<form"; content:!"</html>";\
+#	content:!"</head>"; content:!"</title>"; content:!"</body>"; content:!"</h1>";\
+#	content:!"</h2>"; content:!"</h3>"; content:!"</h4>"; content:!"</h5>";\
+#	content:!"</h6>"; content:!"</br>"; content:!"</p>"; content:!"</a>";\
+#	content:!"</form>"; content:!"%20"; content:!"<div>"; content:!"</div>";\
+#	http.content_type; content:"text/html"; startswith; flowint: susEncoding,==,1;\
+#	flowint: susEncoding,+,1; sid:2000008;)
+# end of alternative for problem 4
+
+alert tcp-stream $HOME_NET any -> $EXTERNAL_NET 80 (msg:"TAD Suspicious file request.";\
+	flow:to_server; content:"Connection: Keep-Alive";\
+	http.uri; content:".png"; endswith; http.method; content:"GET";\
+	flowbits:isnotset,susPNG; flowbits:set,susPNG; flowbits: noalert;\
+	sid:2000009;)
+	
+alert tcp-stream $EXTERNAL_NET 80 -> $HOME_NET any (msg:"TAD MALWARE PE File Detected!";\
+	flow:to_client; content:!"|89 50 4E 47 0D 0A 1A 0A|"; nocase; content:"MZ";\
+	content:"This program cannot be run in DOS mode."; flowbits:isset,susPNG;\
+	sid:2000010;)
+
